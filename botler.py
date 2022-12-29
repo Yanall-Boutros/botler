@@ -23,23 +23,31 @@ class Client(discord.Client):
         return
 
     async def muffle(self, cdr=""):
-        if "Support" not in self.message.author.name: return
-        if "Spurley" not in self.message.author.name: return
-        cdr = cdr.replace("<@", "")
-        cdr = cdr.replace(">", "")
-        while True:
+        if not ("Support" in self.message.author.name or\
+               "Spurley" in self.message.author.name): return
+        try:
+            target_name = cdr.split()[0]
+            length = int(cdr.split()[1])
+        except Exception as e:
+            print(e)
+            length = 10
+
+        target_name = target_name.replace("<@", "")
+        target_name = target_name.replace(">", "")
+        while length>0:
             await asyncio.sleep(1)
-            target = await self.message.guild.fetch_member(cdr)
+            target = await self.message.guild.fetch_member(target_name)
             await target.edit(mute=True)
+            length -= 1
         return
 
     async def unmuffle(self, cdr=""):
-        if "Support" not in self.message.author.name: return
-        if "Spurley" not in self.message.author.name: return
+        if not ("Support" in self.message.author.name or\
+               "Spurley" in self.message.author.name): return
         cdr = cdr.replace("<@", "")
         cdr = cdr.replace(">", "")
         target = await self.message.guild.fetch_member(cdr)
-        await target.edit(mute=True)
+        await target.edit(mute=False)
         return
 
     async def transcribe(self, cdr=""):
