@@ -1,4 +1,5 @@
 import discord
+import asyncio
 import time
 import dotenv
 import sys
@@ -6,9 +7,7 @@ import os
 import pdb
 import discord
 import logging
-import whisper
 import subprocess as s
-model = whisper.load_model("base")
 pkey = dotenv.dotenv_values()['token']
 class Client(discord.Client):
     msg = {}
@@ -21,6 +20,26 @@ class Client(discord.Client):
 
     async def echo(self, cdr=""):
         await self.message.channel.send(cdr)
+        return
+
+    async def muffle(self, cdr=""):
+        if "Support" not in self.message.author.name: return
+        if "Spurley" not in self.message.author.name: return
+        cdr = cdr.replace("<@", "")
+        cdr = cdr.replace(">", "")
+        while True:
+            await asyncio.sleep(1)
+            target = await self.message.guild.fetch_member(cdr)
+            await target.edit(mute=True)
+        return
+
+    async def unmuffle(self, cdr=""):
+        if "Support" not in self.message.author.name: return
+        if "Spurley" not in self.message.author.name: return
+        cdr = cdr.replace("<@", "")
+        cdr = cdr.replace(">", "")
+        target = await self.message.guild.fetch_member(cdr)
+        await target.edit(mute=True)
         return
 
     async def transcribe(self, cdr=""):
@@ -76,6 +95,8 @@ class Client(discord.Client):
             "echo" : echo,
             "q": queue,
             "transcribe": transcribe,
+            "muffle": muffle,
+            "unmuffle": unmuffle,
             }
 
 
