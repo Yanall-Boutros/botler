@@ -4,6 +4,7 @@ import time
 import dotenv
 import sys
 import os
+import numpy as np
 import pdb
 import discord
 import logging
@@ -21,6 +22,12 @@ class Client(discord.Client):
     async def echo(self, cdr=""):
         await self.message.channel.send(cdr)
         return
+
+    async def penis(self, cdr=""):
+        split = cdr.split()
+        target = await self.message.guild.fetch_member(split[0])
+        if len(split) == 1: await target.edit(nick="᲼")
+        else: await target.edit(nick=" ".join(split[1:]))
 
     async def muffle(self, cdr=""):
         if not ("Support" in self.message.author.name or\
@@ -40,6 +47,9 @@ class Client(discord.Client):
             await target.edit(mute=True)
             length -= 1
         return
+    async def rand_num(self, cdr=""):
+        bottom, top = tuple(map(lambda x: int(x), cdr.split()))
+        await self.message.channel.send(str(np.random.randint(bottom, top)))
 
     async def unmuffle(self, cdr=""):
         if not ("Support" in self.message.author.name or\
@@ -105,6 +115,8 @@ class Client(discord.Client):
             "transcribe": transcribe,
             "muffle": muffle,
             "unmuffle": unmuffle,
+            "rand_num": rand_num,
+            "strip_identity": penis
             }
 
 
