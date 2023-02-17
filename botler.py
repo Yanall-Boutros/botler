@@ -1,7 +1,8 @@
 import discord
 import asyncio
+from pytube import YouTube
 import time
-import dotenv
+#import dotenv
 import sys
 import os
 import numpy as np
@@ -9,9 +10,12 @@ import pdb
 import discord
 import logging
 import subprocess as s
-pkey = dotenv.dotenv_values()['token']
+pkey = ""
+with open(".env", "r") as key: pkey = key.read().strip()
 class Client(discord.Client):
     msg = {}
+    vc = None
+    q = []
     async def queue(self, cdr=""):
         await self.message.author.voice.channel.connect()
         with open(cdr, 'r') as f:
@@ -62,17 +66,17 @@ class Client(discord.Client):
 
     async def transcribe(self, cdr=""):
         files = []
-        if len(self.message.attachments) == 0: 
+        if len(self.message.attachments) == 0:
             await self.message.channel.send("No input!")
             return
 
-        for atm in self.message.attachments: 
+        for atm in self.message.attachments:
             files.append(atm.filename)
             with open(f"./{atm.filename}", "w") as a: atm.save(a)
 
         for fl in files:
             fltype = str(s.run(["file", fl], capture_output=True).stdout, 'utf-8').strip()
-            if all(list(map(lambda cnd: cnd in fltype, ["PCM", "mono", "16000"]))): 
+            if all(list(map(lambda cnd: cnd in fltype, ["PCM", "mono", "16000"]))):
                 data = model.transcribe(f"{fl}")
                 with open(f"{fl}.txt", "w") as t: t.write(data['text'])
                 with open(f"{fl}.txt", "rb") as t: await self.message.channel.send("Processed: ",
@@ -83,7 +87,7 @@ class Client(discord.Client):
                 with open(f"{fl}.wav.txt", "w") as t: t.write(data['text'])
                 with open(f"{fl}.wav.txt", "rb") as t: await self.message.channel.send("Processed: ",
                         file=discord.File(t, f"{fl}.wav.txt"))
-                
+
 
     async def interpret(self):
         inp = self.message.content[7:].strip().split()
@@ -96,7 +100,7 @@ class Client(discord.Client):
             cdr = " ".join(inp[1:])
             await self.func_dict[fnc](self, cdr)
             return
-        else: 
+        else:
             await self.func_dict[fnc](self)
             return
 
@@ -109,6 +113,30 @@ class Client(discord.Client):
         if len(message.content) > 7 and message.content.startswith('botler!'):
             self.message = message
             await self.interpret()
+    async def clearq(self): self.q = []
+
+    async def play(self, message):
+        user = self.message.author
+        voice_channel=user.voice.channel
+        channel=None
+        if len(self.q) == 0: self.q = [message]
+        if voice_channel!=None:
+            channel=voice_channel.name
+            if self.vc is not None:
+                self.q.append(message)
+                await self.message.channel.send(f"+2q")
+            else:
+                self.vc = await voice_channel.connect()
+                while(len(self.q)):
+                    yt = YouTube(self.q.pop(0))
+                    video = yt.streams.filter(only_audio=True).first()
+                    out = video.download(output_path=".")
+                    s = discord.FFmpegPCMAudio(source=out)
+                    self.vc.play(source=s)
+                    while self.vc.is_playing(): pass
+                    os.remove(out)
+            await self.vc.disconnect()
+            self.vc=None
     func_dict = {
             "echo" : echo,
             "q": queue,
@@ -116,7 +144,9 @@ class Client(discord.Client):
             "muffle": muffle,
             "unmuffle": unmuffle,
             "rand_num": rand_num,
-            "strip_identity": penis
+            "strip_identity": penis,
+            "play": play,
+            "clearq": clearq,
             }
 
 
@@ -124,7 +154,7 @@ check = lambda message: message.author.id == some_author_id
 
 intents = discord.Intents.default()
 intents.message_content = True
-    
+
 client = Client(intents=intents)
 
 def main(): client.run(pkey)
