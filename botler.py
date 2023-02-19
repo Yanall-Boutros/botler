@@ -1,4 +1,6 @@
 import discord
+from discord.ext import tasks
+from discord.ext import commands as c
 import asyncio
 from pytube import YouTube
 import time
@@ -6,6 +8,7 @@ import time
 import sys
 import os
 import numpy as np
+import datetime
 import pdb
 import discord
 import logging
@@ -16,6 +19,22 @@ class Client(discord.Client):
     msg = {}
     vc = None
     q = []
+    timers = {}
+    @tasks.loop(seconds=60)
+    async def check_timers(self):
+        print("Checking timers:")
+        print(self.timers)
+        now = datetime.datetime.now()
+        key = datetime.datetime.strptime(f"{now.hour}:{now.minute}", "%H:%M")
+        print(str(key))
+        print(str(key) in self.timers)
+        if str(key) in self.timers:
+            print("Key in timers")
+            for author, content in self.timers[str(key)]:
+                user = await self.fetch_user(author)
+                print("DMing User", author, content)
+                await user.send(content)
+
     async def queue(self, cdr=""):
         await self.message.author.voice.channel.connect()
         with open(cdr, 'r') as f:
@@ -106,6 +125,8 @@ class Client(discord.Client):
 
     async def on_ready(self):
         print(f'Logged on as {self.user}!')
+        if not self.check_timers.is_running():
+            self.check_timers.start()
 
     async def on_message(self, message):
         print(f'Message from {message.author}: {message.content}')
@@ -114,6 +135,17 @@ class Client(discord.Client):
             self.message = message
             await self.interpret()
     async def clearq(self): self.q = []
+    async def remind(self, cdr):
+        # cdr[0] = at what time in their timezone
+        # cdr[1] = message to be reminded
+        time = cdr.split()[0]
+        content = cdr.split()[1:]
+        author = self.message.author.id
+        remtime=datetime.datetime.strptime(time, "%H:%M")
+        if str(remtime) in self.timers: self.timers[str(remtime)].append((author, " ".join(content)))
+        else: self.timers[str(remtime)] = [(author, " ".join(content))]
+
+
 
     async def play(self, message):
         user = self.message.author
@@ -147,6 +179,7 @@ class Client(discord.Client):
             "strip_identity": penis,
             "play": play,
             "clearq": clearq,
+            "remindme": remind,
             }
 
 
