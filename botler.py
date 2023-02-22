@@ -1,4 +1,5 @@
 import discord
+from dateutil import parser
 from discord.ext import tasks
 from discord.ext import commands as c
 import asyncio
@@ -20,20 +21,34 @@ class Client(discord.Client):
     vc = None
     q = []
     timers = {}
+
     @tasks.loop(seconds=60)
     async def check_timers(self):
         print("Checking timers:")
         print(self.timers)
         now = datetime.datetime.now()
-        key = datetime.datetime.strptime(f"{now.hour}:{now.minute}", "%H:%M")
-        print(str(key))
-        print(str(key) in self.timers)
-        if str(key) in self.timers:
-            print("Key in timers")
-            for author, content in self.timers[str(key)]:
+        key = f"{now.hour-8}:{now.minute}"
+        print(key)
+        if key in self.timers:
+            for author, content in self.timers[key]:
                 user = await self.fetch_user(author)
                 print("DMing User", author, content)
                 await user.send(content)
+
+    async def remind(self, cdr):
+        # cdr[0] = at what time in their timezone
+        # cdr[1] = message to be reminded
+        time = cdr.split()[0]
+        utc = int(cdr.split()[1])
+        content = cdr.split()[2:]
+        author = self.message.author.id
+        remtime=parser.parse(time)
+        remtime = remtime.replace(hour=remtime.hour)
+        k = f"{remtime.hour+utc}:{remtime.minute}"
+        if k in self.timers: self.timers[k].append((author, " ".join(content)))
+        else: self.timers[k] = [(author, " ".join(content))]
+        await self.check_timers()
+
 
     async def queue(self, cdr=""):
         await self.message.author.voice.channel.connect()
@@ -134,19 +149,8 @@ class Client(discord.Client):
         if len(message.content) > 7 and message.content.startswith('botler!'):
             self.message = message
             await self.interpret()
+
     async def clearq(self): self.q = []
-    async def remind(self, cdr):
-        # cdr[0] = at what time in their timezone
-        # cdr[1] = message to be reminded
-        time = cdr.split()[0]
-        content = cdr.split()[1:]
-        author = self.message.author.id
-        remtime=datetime.datetime.strptime(time, "%H:%M")
-        if str(remtime) in self.timers: self.timers[str(remtime)].append((author, " ".join(content)))
-        else: self.timers[str(remtime)] = [(author, " ".join(content))]
-
-
-
     async def play(self, message):
         user = self.message.author
         voice_channel=user.voice.channel
@@ -156,19 +160,21 @@ class Client(discord.Client):
             channel=voice_channel.name
             if self.vc is not None:
                 self.q.append(message)
-                await self.message.channel.send(f"+2q")
+                await self.message.channel.send(f"+2q:{message}")
             else:
                 self.vc = await voice_channel.connect()
                 while(len(self.q)):
                     yt = YouTube(self.q.pop(0))
                     video = yt.streams.filter(only_audio=True).first()
                     out = video.download(output_path=".")
+                    await self.message.channel.send(f"Playing: {out}")
                     s = discord.FFmpegPCMAudio(source=out)
                     self.vc.play(source=s)
                     while self.vc.is_playing(): pass
                     os.remove(out)
             await self.vc.disconnect()
             self.vc=None
+
     func_dict = {
             "echo" : echo,
             "q": queue,
