@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import discord
 from dateutil import parser
 from discord.ext import tasks
@@ -14,6 +15,7 @@ import pdb
 import discord
 import logging
 import subprocess as s
+import yt_dlp as youtube_dl
 pkey = ""
 with open(".env", "r") as key: pkey = key.read().strip()
 class Client(discord.Client):
@@ -164,14 +166,20 @@ class Client(discord.Client):
             else:
                 self.vc = await voice_channel.connect()
                 while(len(self.q)):
-                    yt = YouTube(self.q.pop(0))
+                    link = self.q.pop(0)
+                    ydl_opts = {'format': 'bestaudio/best',
+                                'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}]
+                               }
+                    filename=""
+                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                        info=ydl.extract_info(link, download=True)
+                        filename = f"{ydl.prepare_filename(info)[:-5]}.mp3"
                     video = yt.streams.filter(only_audio=True).first()
-                    out = video.download(output_path=".")
-                    await self.message.channel.send(f"Playing: {out}")
-                    s = discord.FFmpegPCMAudio(source=out)
+                    await self.message.channel.send(f"Playing: {filename}")
+                    s = discord.FFmpegPCMAudio(source=filename)
                     self.vc.play(source=s)
-                    while self.vc.is_playing(): pass
-                    os.remove(out)
+                    while self.vc.is_playing(): await asyncio.sleep(1)
+                    os.remove(filename)
             await self.vc.disconnect()
             self.vc=None
 
